@@ -2,7 +2,8 @@ import os
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from templateapi.api.demo import router as router_demo
-from . import __version__
+from templateapi.api.demo_auth import router as router_auth
+from templateapi import __version__
 
 environment = os.getenv("ENVIRONMENT", "DEV")
 if environment.upper() == "PROD":
@@ -26,3 +27,4 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 app.include_router(router_demo, prefix="/demo", tags=["demo"])
+app.include_router(router_auth, prefix="/auth", tags=["auth"])

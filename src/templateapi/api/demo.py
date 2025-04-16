@@ -14,7 +14,7 @@ router = APIRouter()
 def demo():
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"message": str(e)},
+        content={"message": "Module demo is running"},
     )
 
 

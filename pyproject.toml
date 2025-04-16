@@ -29,12 +29,15 @@ dependencies = [
     "pytest >=7",
     "python-dotenv",
     "uvicorn",
+    "python-jose[cryptography]",
+    "passlib[bcrypt]",
+    "python-multipart",
     "templatelib@git+https://github.com/IHCantabria/template.python.lib#egg=main",
 ]
 
 
 [project.optional-dependencies]
-dev = ["flit", "black", "sphinx", "myst-nb", "sphinx_rtd_theme"]
+dev = ["flit", "black", "httpx", "sphinx", "myst-nb", "sphinx_rtd_theme"]
 
 
 [project.urls]
