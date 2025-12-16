@@ -4,6 +4,7 @@ build-backend = "flit_core.buildapi"
 
 
 [project]
+version = "0.2.0"
 name = "templateapi"
 authors = [{ name = "Felipe Maza", email = "felipe.maza@unican.es" }]
 maintainers = [{ name = "Felipe Maza", email = "felipe.maza@unican.es" }]
