@@ -1,98 +1,336 @@
-import os
 import argparse
+import logging
+import subprocess
+import sys
+from pathlib import Path
 
 try:
     import toml
 except ImportError:
-    raise Exception("❌pip install toml")
+    print("❌ Error: toml library not installed")
+    print("Install with: pip install toml")
+    sys.exit(1)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
-parser = argparse.ArgumentParser()
+def run_command(cmd, capture_output=True, check=True):
+    """
+    Run a shell command using subprocess.
 
-# Add a new argument to the parser for major version
+    Args:
+        cmd: Command as string or list
+        capture_output: Whether to capture stdout/stderr
+        check: Whether to raise exception on non-zero exit
 
-parser.add_argument("--major", action="store_true")
+    Returns:
+        CompletedProcess instance
 
-# Add a new argument to the parser for minor version
+    Raises:
+        subprocess.CalledProcessError if command fails and check=True
+    """
+    try:
+        if isinstance(cmd, str):
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=capture_output,
+                text=True,
+                check=check,
+            )
+        else:
+            result = subprocess.run(
+                cmd, capture_output=capture_output, text=True, check=check
+            )
+        return result
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Command failed: {cmd}")
+        if e.stdout:
+            logger.error(f"stdout: {e.stdout}")
+        if e.stderr:
+            logger.error(f"stderr: {e.stderr}")
+        raise
 
-parser.add_argument("--minor", action="store_true")
 
-# Add a new argument to the parser for patch version
+def parse_version(version_str):
+    """Parse version string into components."""
+    # Remove 'v' prefix if present
+    clean_version = version_str.lstrip("v")
+    parts = clean_version.split(".")
 
-parser.add_argument("--patch", action="store_true")
+    if len(parts) != 3:
+        raise ValueError(
+            f"Invalid version format: {version_str}. Expected format: v1.2.3"
+        )
 
-args = parser.parse_args()
+    try:
+        return [int(p) for p in parts]
+    except ValueError:
+        raise ValueError(
+            f"Invalid version format: {version_str}. Version parts must be integers."
+        )
 
-# Read version from pyproject.toml
 
-with open("pyproject.toml") as f:
-    config = toml.load(f)
+def format_version(major, minor, patch):
+    """Format version components into string."""
+    return f"v{major}.{minor}.{patch}"
 
-version = config["project"]["version"]
 
-# Update major version
+def update_version(current_version, bump_type):
+    """
+    Update version based on bump type.
 
-if args.major:
-    version = version[1:].split(".")
-    major = str(int(version[0]) + 1)
-    version[0] = "v{0}".format(major)
-    version[1] = "0"
-    version[2] = "0"
+    Args:
+        current_version: Current version string (e.g., 'v1.2.3')
+        bump_type: One of 'major', 'minor', 'patch'
 
-    version = ".".join(version)
+    Returns:
+        New version string
+    """
+    major, minor, patch = parse_version(current_version)
 
-# Update minor version
+    if bump_type == "major":
+        major += 1
+        minor = 0
+        patch = 0
+    elif bump_type == "minor":
+        minor += 1
+        patch = 0
+    elif bump_type == "patch":
+        patch += 1
+    else:
+        raise ValueError(f"Invalid bump type: {bump_type}")
 
-if args.minor:
-    version = version.split(".")
+    return format_version(major, minor, patch)
 
-    version[1] = str(int(version[1]) + 1)
-    version[2] = "0"
 
-    version = ".".join(version)
+def check_git_status():
+    """Check if repository is clean."""
+    logger.info("Verificando estado del repositorio...")
+    try:
+        result = run_command(
+            ["git", "diff-index", "--quiet", "HEAD", "--"], check=False
+        )
+        if result.returncode != 0:
+            logger.error("Hay cambios sin commit en el repositorio")
+            logger.error(
+                "Por favor, haz commit de tus cambios antes de desplegar"
+            )
+            return False
+    except Exception as e:
+        logger.error(f"Error verificando estado de git: {e}")
+        return False
 
-# Update patch version
+    logger.info("✓ Repositorio limpio")
+    return True
 
-if args.patch:
-    version = version.split(".")
 
-    version[2] = str(int(version[2]) + 1)
+def check_current_branch():
+    """Check current git branch."""
+    logger.info("Verificando rama actual...")
+    try:
+        result = run_command(["git", "branch", "--show-current"])
+        branch = result.stdout.strip()
+        logger.info(f"Rama actual: {branch}")
 
-    version = ".".join(version)
+        if branch not in ["main", "master"]:
+            logger.warning(
+                f"⚠️  No estás en la rama main/master (estás en '{branch}')"
+            )
+            response = input("¿Deseas continuar de todas formas? (s/N): ")
+            if response.lower() not in ["s", "si", "sí", "yes", "y"]:
+                logger.info("Despliegue cancelado")
+                return False
 
-# Create a new tag with the new version
+        return True
+    except Exception as e:
+        logger.error(f"Error verificando rama: {e}")
+        return False
 
-# Check if there are any changes in the repository
 
-if os.system("git diff-index --quiet HEAD --") != 0:
-    print(
-        "There are changes in the repository. Please commit them before deploying."
+def run_tests():
+    """Run test suite."""
+    logger.info("Ejecutando tests...")
+    try:
+        result = run_command(["pytest"], capture_output=False)
+        logger.info("✓ Tests pasaron exitosamente")
+        return True
+    except subprocess.CalledProcessError:
+        logger.error("❌ Tests fallaron")
+        logger.error("Por favor, arregla los tests antes de desplegar")
+        return False
+
+
+def rollback_changes(original_content, filepath):
+    """Rollback changes to pyproject.toml."""
+    logger.warning("Realizando rollback de cambios...")
+    try:
+        with open(filepath, "w") as f:
+            toml.dump(original_content, f)
+        logger.info("✓ Rollback completado")
+    except Exception as e:
+        logger.error(f"Error durante rollback: {e}")
+        logger.error("Por favor, revisa manualmente el archivo pyproject.toml")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Script de despliegue para actualizar versión y crear tags",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Ejemplos:
+  python deploy.py --patch    # Incrementa versión patch (v1.2.3 -> v1.2.4)
+  python deploy.py --minor    # Incrementa versión minor (v1.2.3 -> v1.3.0)
+  python deploy.py --major    # Incrementa versión major (v1.2.3 -> v2.0.0)
+  python deploy.py --dry-run --patch  # Simula sin hacer cambios
+        """,
     )
-    exit(1)
 
-# Run tests
+    # Create mutually exclusive group for version bump
+    version_group = parser.add_mutually_exclusive_group(required=True)
+    version_group.add_argument(
+        "--major", action="store_true", help="Incrementar versión major"
+    )
+    version_group.add_argument(
+        "--minor", action="store_true", help="Incrementar versión minor"
+    )
+    version_group.add_argument(
+        "--patch", action="store_true", help="Incrementar versión patch"
+    )
 
-if os.system("pytest") != 0:
-    print("Tests failed. Please fix them before deploying.")
-    exit(1)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simular sin hacer cambios reales",
+    )
+    parser.add_argument(
+        "--skip-tests", action="store_true", help="Saltar ejecución de tests"
+    )
+    parser.add_argument(
+        "--yes", "-y", action="store_true", help="Confirmar automáticamente"
+    )
 
-# Write new version to pyproject.toml
+    args = parser.parse_args()
 
-version = version
+    # Determine bump type
+    if args.major:
+        bump_type = "major"
+    elif args.minor:
+        bump_type = "minor"
+    else:
+        bump_type = "patch"
 
-config["project"]["version"] = version
+    if args.dry_run:
+        logger.info("🔍 MODO DRY-RUN: No se realizarán cambios reales")
 
-with open("pyproject.toml", "w") as f:
-    toml.dump(config, f)
+    # Check git status
+    if not check_git_status():
+        sys.exit(1)
 
-# Commit changes and create a new tag
+    # Check current branch
+    if not check_current_branch():
+        sys.exit(1)
 
-os.system("git add pyproject.toml")
+    # Run tests
+    if not args.skip_tests:
+        if not run_tests():
+            sys.exit(1)
+    else:
+        logger.warning("⚠️  Saltando tests (--skip-tests)")
 
-os.system("git commit -m 'Bump version to {0}'".format(version))
+    # Read current version
+    pyproject_path = Path("pyproject.toml")
+    if not pyproject_path.exists():
+        logger.error("No se encontró pyproject.toml")
+        sys.exit(1)
 
-os.system("git tag -a {0} -m 'Version {0}'".format(version))
+    try:
+        with open(pyproject_path) as f:
+            config = toml.load(f)
 
-os.system("git push origin tag {0}".format(version))
+        # Keep original config for rollback
+        original_config = config.copy()
 
-os.system("git push")
+        current_version = config["project"]["version"]
+        logger.info(f"Versión actual: {current_version}")
+
+        # Calculate new version
+        new_version = update_version(current_version, bump_type)
+        logger.info(f"Nueva versión: {new_version}")
+
+    except Exception as e:
+        logger.error(f"Error leyendo pyproject.toml: {e}")
+        sys.exit(1)
+
+    # Confirm with user
+    if not args.yes and not args.dry_run:
+        logger.info(f"\n📦 Se va a desplegar la versión {new_version}")
+        logger.info("Esto incluye:")
+        logger.info("  1. Actualizar pyproject.toml")
+        logger.info("  2. Crear commit con los cambios")
+        logger.info(f"  3. Crear tag {new_version}")
+        logger.info("  4. Hacer push a origin")
+
+        response = input("\n¿Deseas continuar? (s/N): ")
+        if response.lower() not in ["s", "si", "sí", "yes", "y"]:
+            logger.info("Despliegue cancelado")
+            sys.exit(0)
+
+    if args.dry_run:
+        logger.info("\n✓ Dry-run completado. En modo normal se ejecutaría:")
+        logger.info(f"  - Actualizar versión a {new_version}")
+        logger.info(f"  - git add pyproject.toml")
+        logger.info(f"  - git commit -m 'Bump version to {new_version}'")
+        logger.info(f"  - git tag -a {new_version} -m 'Version {new_version}'")
+        logger.info(f"  - git push origin {new_version}")
+        logger.info(f"  - git push")
+        sys.exit(0)
+
+    # Update version in config
+    config["project"]["version"] = new_version
+
+    try:
+        # Write new version
+        logger.info("Actualizando pyproject.toml...")
+        with open(pyproject_path, "w") as f:
+            toml.dump(config, f)
+
+        # Git operations
+        logger.info("Agregando cambios a git...")
+        run_command(["git", "add", "pyproject.toml"])
+
+        logger.info("Creando commit...")
+        run_command(["git", "commit", "-m", f"Bump version to {new_version}"])
+
+        logger.info(f"Creando tag {new_version}...")
+        run_command(
+            ["git", "tag", "-a", new_version, "-m", f"Version {new_version}"]
+        )
+
+        logger.info("Haciendo push del tag...")
+        run_command(["git", "push", "origin", new_version])
+
+        logger.info("Haciendo push de los cambios...")
+        run_command(["git", "push"])
+
+        logger.info(f"\n✅ Despliegue completado exitosamente: {new_version}")
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"\n❌ Error durante el despliegue: {e}")
+        rollback_changes(original_config, pyproject_path)
+        logger.error(
+            "\nPuede que necesites revertir cambios de git manualmente:"
+        )
+        logger.error("  git reset --soft HEAD~1  # Deshacer último commit")
+        logger.error(f"  git tag -d {new_version}  # Eliminar tag local")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"\n❌ Error inesperado: {e}")
+        rollback_changes(original_config, pyproject_path)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
