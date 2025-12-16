@@ -37,7 +37,15 @@ dependencies = [
 
 
 [project.optional-dependencies]
-dev = ["flit", "black", "httpx", "sphinx", "myst-nb", "sphinx_rtd_theme"]
+dev = [
+    "flit",
+    "black",
+    "httpx",
+    "sphinx",
+    "myst-nb",
+    "sphinx_rtd_theme",
+    "toml",
+]
 
 
 [project.urls]
