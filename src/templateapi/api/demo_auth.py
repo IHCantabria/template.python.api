@@ -52,6 +52,7 @@ class LoginRequest(BaseModel):
 # Base de datos ficticia de usuarios
 fake_users_db = {
     "juanperez": {
+        "username": "juanperez",
         "full_name": "Juan Pérez",
         "email": "juanperez@example.com",
         "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # "secret"
