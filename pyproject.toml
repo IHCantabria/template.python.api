@@ -30,7 +30,8 @@ dependencies = [
     "python-dotenv",
     "uvicorn",
     "python-jose[cryptography]",
-    "passlib[bcrypt]",
+    "passlib",
+    "bcrypt==3.2.0",
     "python-multipart",
     "templatelib@git+https://github.com/IHCantabria/template.python.lib#egg=main",
 ]
