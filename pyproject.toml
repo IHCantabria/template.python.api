@@ -1,7 +1,5 @@
 [build-system]
-requires = [
-    "flit_core >=3.2,<4",
-]
+requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
@@ -22,9 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-dynamic = [
-    "description",
-]
+dynamic = ["description"]
 dependencies = [
     "fastapi",
     "pytest >=7",
@@ -37,23 +33,15 @@ dependencies = [
     "templatelib@git+https://github.com/IHCantabria/template.python.lib#egg=main",
     "tomli",
     "tomli-w",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
 ]
-authors = [
-    { name = "Felipe Maza", email = "felipe.maza@unican.es" },
-]
-maintainers = [
-    { name = "Felipe Maza", email = "felipe.maza@unican.es" },
-]
+authors = [{ name = "Felipe Maza", email = "felipe.maza@unican.es" }]
+maintainers = [{ name = "Felipe Maza", email = "felipe.maza@unican.es" }]
 
 [project.optional-dependencies]
-dev = [
-    "flit",
-    "black",
-    "httpx",
-    "sphinx",
-    "myst-nb",
-    "sphinx_rtd_theme",
-]
+dev = ["flit", "black", "httpx", "sphinx", "myst-nb", "sphinx_rtd_theme"]
 
 [project.urls]
 documentation = "https://ihcantabria.github.io/template.python.api/"
