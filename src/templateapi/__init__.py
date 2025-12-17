@@ -13,8 +13,8 @@ from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.resources import Resource
 
-# Cargamos variables de entorno PRIMERO
-load_dotenv()
+# Cargamos variables de entorno PRIMERO (sin mensajes verbose)
+load_dotenv(verbose=False)
 
 # Versión del paquete
 with open("pyproject.toml", "rb") as f:
@@ -33,12 +33,9 @@ try:
     if isinstance(existing_provider, LoggerProvider):
         logger_provider = existing_provider
     else:
-        # Establecer el nivel de log
-        # La biblioteca tiene un bug que ignora la variable OTEL_LOG_LEVEL
-        # por lo que tenemos que añadirlo de manera manual con estas líneas
+        # Establecer el nivel de log desde la variable de entorno
         log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         log_level_numeric = getattr(logging, log_level, logging.INFO)
-        logging.basicConfig(level=log_level_numeric)
 
         # Creamos el objeto provider y opcionalmente le podemos añadir un UUID
         # para filtrar en SEQ con @Resource.service.instance.id="codigo-uuid"
@@ -52,7 +49,6 @@ try:
         set_logger_provider(logger_provider)
 
         # Creamos el exportador para enviar los logs al servidor
-        # Las variables de entorno OTEL_EXPORTER_OTLP_* se leen automáticamente
         exporter = OTLPLogExporter(
             endpoint=os.getenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"),
             headers={
@@ -65,11 +61,24 @@ try:
             BatchLogRecordProcessor(exporter)
         )
 
-        # Añadimos el hander al logger
-        handler = LoggingHandler(logger_provider=logger_provider)
-        logging.getLogger("urllib3.connectionpool").setLevel(logging.INFO)
-        logging.getLogger("numba.core").setLevel(logging.INFO)
-        logging.getLogger().addHandler(handler)
+        # Configurar el handler de OpenTelemetry con el nivel correcto
+        handler = LoggingHandler(
+            level=log_level_numeric, logger_provider=logger_provider
+        )
+
+        # Configurar logging con el handler de OpenTelemetry
+        logging.basicConfig(
+            level=log_level_numeric,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[
+                logging.StreamHandler(),  # Para consola
+                handler,  # Para OpenTelemetry/SEQ
+            ],
+        )
+
+        # Silenciar logs verbosos de librerías de terceros
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("passlib").setLevel(logging.INFO)
 
 
 except Exception as e:
@@ -82,7 +91,6 @@ except Exception as e:
 
 
 # Verificamos la existencia de variables de entorno requeridas
-logging.debug("Cargando variables de entorno")
 env_vars = [
     "ENVIRONMENT",
     "LOG_DIR",

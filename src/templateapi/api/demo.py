@@ -1,3 +1,4 @@
+import logging
 import shutil
 import uuid
 from pathlib import Path
@@ -9,9 +10,12 @@ from templatelib.template import Template
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
+
 
 @router.get("/is-running")
 def demo():
+    logger.debug("/is-running called")
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"message": "Module demo is running"},
