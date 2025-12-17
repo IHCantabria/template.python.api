@@ -3,7 +3,7 @@ requires = [ "flit_core >=3.2,<4",]
 build-backend = "flit_core.buildapi"
 
 [project]
-version = "v0.3.0"
+version = "v0.4.0"
 name = "templateapi"
 readme = "README.md"
 requires-python = ">=3.9"
