@@ -2,12 +2,12 @@
 
 import os
 import logging
-import toml
+import tomli
 from dotenv import load_dotenv
 
 # Versión del paquete
-with open("pyproject.toml") as f:
-    config = toml.load(f)
+with open("pyproject.toml", "rb") as f:
+    config = tomli.load(f)
 
 version = config["project"]["version"]
 

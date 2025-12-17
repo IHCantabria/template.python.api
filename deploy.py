@@ -5,10 +5,11 @@ import sys
 from pathlib import Path
 
 try:
-    import toml
+    import tomli
+    import tomli_w
 except ImportError:
-    print("❌ Error: toml library not installed")
-    print("Install with: pip install toml")
+    print("❌ Error: tomli/tomli_w libraries not installed")
+    print("Install with: pip install tomli tomli-w")
     sys.exit(1)
 
 # Configure logging
@@ -167,8 +168,8 @@ def rollback_changes(original_content, filepath):
     """Rollback changes to pyproject.toml."""
     logger.warning("Realizando rollback de cambios...")
     try:
-        with open(filepath, "w") as f:
-            toml.dump(original_content, f)
+        with open(filepath, "wb") as f:
+            tomli_w.dump(original_content, f)
         logger.info("✓ Rollback completado")
     except Exception as e:
         logger.error(f"Error durante rollback: {e}")
@@ -247,8 +248,8 @@ Ejemplos:
         sys.exit(1)
 
     try:
-        with open(pyproject_path) as f:
-            config = toml.load(f)
+        with open(pyproject_path, "rb") as f:
+            config = tomli.load(f)
 
         # Keep original config for rollback
         original_config = config.copy()
@@ -294,8 +295,8 @@ Ejemplos:
     try:
         # Write new version
         logger.info("Actualizando pyproject.toml...")
-        with open(pyproject_path, "w") as f:
-            toml.dump(config, f)
+        with open(pyproject_path, "wb") as f:
+            tomli_w.dump(config, f)
 
         # Git operations
         logger.info("Agregando cambios a git...")
