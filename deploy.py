@@ -292,6 +292,19 @@ Ejemplos:
     # Update version in config
     config["project"]["version"] = new_version
 
+    # Preguntar por mensaje personalizado de commit
+    commit_message = f"Bump version to {new_version}"
+    if not args.yes and not args.dry_run:
+        response = input(
+            "\n¿Deseas añadir un mensaje personalizado al commit? (s/N): "
+        )
+        if response.lower() in ["s", "si", "sí", "yes", "y"]:
+            custom_msg = input(
+                "Escribe tu mensaje (se añadirá la versión al final): "
+            ).strip()
+            if custom_msg:
+                commit_message = f"{custom_msg} - {new_version}"
+
     try:
         # Write new version
         logger.info("Actualizando pyproject.toml...")
@@ -302,8 +315,8 @@ Ejemplos:
         logger.info("Agregando cambios a git...")
         run_command(["git", "add", "pyproject.toml"])
 
-        logger.info("Creando commit...")
-        run_command(["git", "commit", "-m", f"Bump version to {new_version}"])
+        logger.info(f"Creando commit: {commit_message}")
+        run_command(["git", "commit", "-m", commit_message])
 
         logger.info(f"Creando tag {new_version}...")
         run_command(
