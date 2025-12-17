@@ -1,10 +1,10 @@
 """Template"""
 
+import logging
 import os
 
 import tomli
 from dotenv import load_dotenv
-import logging.config  # Importa explícitamente logging.config
 from opentelemetry._logs import set_logger_provider, get_logger_provider
 from opentelemetry.exporter.otlp.proto.http._log_exporter import (
     OTLPLogExporter,
