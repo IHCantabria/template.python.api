@@ -27,23 +27,14 @@ client = TestClient(app, raise_server_exceptions=False)
 
 def test_verify_password():
     """Test para la función de verificación de contraseña"""
+    # Hash conocido para la contraseña "secret"
+    known_hash = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW"
+
     # Contraseña correcta
-    assert (
-        verify_password(
-            "secret",
-            "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-        )
-        == True
-    )
+    assert verify_password("secret", known_hash)
 
     # Contraseña incorrecta
-    assert (
-        verify_password(
-            "wrong_password",
-            "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-        )
-        == False
-    )
+    assert not verify_password("wrong_password", known_hash)
 
 
 def test_get_password_hash():
@@ -52,7 +43,7 @@ def test_get_password_hash():
     # Verificar que el hash tenga el formato correcto de bcrypt
     assert hashed_password.startswith("$2b$")
     # Verificar que el hash funcione para la verificación
-    assert verify_password("testpassword", hashed_password) == True
+    assert verify_password("testpassword", hashed_password)
 
 
 def test_create_access_token():
@@ -77,9 +68,10 @@ def test_create_access_token():
 def test_login_for_access_token():
     """Test para el endpoint de login OAuth2"""
     # Credenciales correctas
+    password = os.getenv("TEST_PASSWORD")
     response = client.post(
         "/auth/login/token",
-        data={"username": "juanperez", "password": "secret"},
+        data={"username": "juanperez", "password": password},
     )
     assert response.status_code == 200
     token_data = response.json()
@@ -89,7 +81,7 @@ def test_login_for_access_token():
     # Credenciales incorrectas - usuario inexistente
     response = client.post(
         "/auth/login/token",
-        data={"username": "nonexistent", "password": "secret"},
+        data={"username": "nonexistent", "password": password},
     )
     assert response.status_code == 401
 
@@ -103,10 +95,13 @@ def test_login_for_access_token():
 
 def test_login_json():
     """Test para el endpoint de login JSON"""
+    # Obtener contraseña de test desde variable de entorno o usar valor por defecto
+    password = os.getenv("TEST_PASSWORD", "secret")
+
     # Credenciales correctas
     response = client.post(
         "/auth/login",
-        json={"username": "juanperez", "password": "secret"},
+        json={"username": "juanperez", "password": password},
     )
     assert response.status_code == 200
     token_data = response.json()
@@ -124,9 +119,10 @@ def test_login_json():
 def test_protected_endpoint_with_token():
     """Test para acceder a un endpoint protegido con token válido"""
     # Primero obtener un token
+    password = os.getenv("TEST_PASSWORD", "secret")
     response = client.post(
         "/auth/login",
-        json={"username": "juanperez", "password": "secret"},
+        json={"username": "juanperez", "password": password},
     )
     token = response.json()["access_token"]
 
@@ -159,9 +155,10 @@ def test_protected_endpoint_with_invalid_token():
 def test_get_user_me():
     """Test para obtener información del usuario autenticado"""
     # Primero obtener un token
+    password = os.getenv("TEST_PASSWORD", "secret")
     response = client.post(
         "/auth/login",
-        json={"username": "juanperez", "password": "secret"},
+        json={"username": "juanperez", "password": password},
     )
     token = response.json()["access_token"]
 
@@ -174,7 +171,7 @@ def test_get_user_me():
     assert user_data["username"] == "juanperez"
     assert user_data["full_name"] == "Juan Pérez"
     assert user_data["email"] == "juanperez@example.com"
-    assert user_data["enabled"] == True
+    assert user_data["enabled"]
 
 
 # -------------------- CONFIGURACIÓN DEL TEST --------------------

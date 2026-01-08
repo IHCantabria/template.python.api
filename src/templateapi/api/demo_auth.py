@@ -16,9 +16,11 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from datetime import datetime, timedelta, UTC
 from typing import Optional
+import os
 
 # Configuración de seguridad
-SECRET_KEY = "tu_clave_secreta_aqui_cambiame"
+# IMPORTANTE: En producción, SECRET_KEY debe estar en variables de entorno
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "CHANGE_ME_IN_PRODUCTION")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -50,12 +52,17 @@ class LoginRequest(BaseModel):
 
 
 # Base de datos ficticia de usuarios
+# ADVERTENCIA: Solo para desarrollo/demo. En producción usar base de datos real
+# El hash corresponde a una contraseña de prueba generada con bcrypt
 fake_users_db = {
     "juanperez": {
         "username": "juanperez",
         "full_name": "Juan Pérez",
         "email": "juanperez@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # "secret"
+        "hashed_password": os.getenv(
+            "JWT_SECRET_KEY",
+            "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
+        ),
         "enabled": True,
     }
 }
