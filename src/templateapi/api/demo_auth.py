@@ -125,7 +125,7 @@ def decode_token(token):
     return token_data
 
 
-async def get_current_user(
+def get_current_user(
     oauth2_token: Optional[str] = Depends(oauth2_scheme),
     api_key: Optional[str] = Depends(api_key_scheme),
 ):
@@ -158,7 +158,7 @@ async def get_current_user(
     raise credentials_exception
 
 
-async def get_current_active_user(
+def get_current_active_user(
     current_user: User = Depends(get_current_user),
 ):
     if not current_user.enabled:
@@ -168,7 +168,7 @@ async def get_current_active_user(
 
 # Endpoints
 @router.post("/login/token", response_model=Token, include_in_schema=False)
-async def login_for_access_token(
+def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
 ):
     user = authenticate_user(
@@ -188,7 +188,7 @@ async def login_for_access_token(
 
 
 @router.post("/login", response_model=Token)
-async def login_json(login_data: LoginRequest):
+def login_json(login_data: LoginRequest):
     user = authenticate_user(
         fake_users_db, login_data.username, login_data.password
     )
@@ -205,17 +205,17 @@ async def login_json(login_data: LoginRequest):
 
 
 @router.get("/users/me/", response_model=User)
-async def read_users_me(current_user: User = Depends(get_current_active_user)):
+def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 
 @router.get("/")
-async def root():
+def root():
     return {"message": "API con autenticación dual por token"}
 
 
 @router.get("/protected-resource/")
-async def protected_resource(
+def protected_resource(
     current_user: User = Depends(get_current_active_user),
 ):
     return {
