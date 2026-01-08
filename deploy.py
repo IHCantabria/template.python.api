@@ -282,11 +282,11 @@ Ejemplos:
     if args.dry_run:
         logger.info("\n✓ Dry-run completado. En modo normal se ejecutaría:")
         logger.info(f"  - Actualizar versión a {new_version}")
-        logger.info(f"  - git add pyproject.toml")
-        logger.info(f"  - git commit -m 'Bump version to {new_version}'")
-        logger.info(f"  - git tag -a {new_version} -m 'Version {new_version}'")
-        logger.info(f"  - git push origin {new_version}")
-        logger.info(f"  - git push")
+        logger.info("  - git add pyproject.toml")
+        logger.info("  - git commit -m 'Bump version to {new_version}'")
+        logger.info("  - git tag -a {new_version} -m 'Version {new_version}'")
+        logger.info("  - git push origin {new_version}")
+        logger.info("  - git push")
         sys.exit(0)
 
     # Update version in config
