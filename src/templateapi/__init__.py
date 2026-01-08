@@ -6,6 +6,8 @@ import os
 import tomli
 from dotenv import load_dotenv
 from opentelemetry._logs import set_logger_provider, get_logger_provider
+
+from templateapi.exceptions import MissingEnvironmentVariableError
 from opentelemetry.exporter.otlp.proto.http._log_exporter import (
     OTLPLogExporter,
 )
@@ -90,22 +92,29 @@ except Exception as e:
         logger_provider.shutdown()
 
 
+def validate_required_env_vars():
+    """Valida que todas las variables de entorno requeridas estén definidas.
+
+    Raises:
+        MissingEnvironmentVariableError: Si falta alguna variable de entorno.
+    """
+    env_vars = [
+        "ENVIRONMENT",
+        "LOG_DIR",
+        "OTEL_SERVICE_NAME",
+        "OTEL_EXPORTER_OTLP_HEADERS",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
+        "LOG_LEVEL",
+    ]
+    no_env_vars = []
+    for ev in env_vars:
+        if os.getenv(ev) is None:
+            logging.error("No se ha encontrado la variable de entorno %s", ev)
+            no_env_vars.append(ev)
+    if len(no_env_vars):
+        raise MissingEnvironmentVariableError(no_env_vars)
+
+
 # Verificamos la existencia de variables de entorno requeridas
-env_vars = [
-    "ENVIRONMENT",
-    "LOG_DIR",
-    "OTEL_SERVICE_NAME",
-    "OTEL_EXPORTER_OTLP_HEADERS",
-    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
-    "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
-    "LOG_LEVEL",
-]
-no_env_vars = []
-for ev in env_vars:
-    if os.getenv(ev) is None:
-        logging.error("No se ha encontrado la variable de entorno %s", ev)
-        no_env_vars.append(ev)
-if len(no_env_vars):
-    raise Exception(
-        f"ERROR: No se ha encontrado la variable de entorno {','.join(no_env_vars)} "
-    )
+validate_required_env_vars()
