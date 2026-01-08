@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
 from datetime import timedelta
-from unittest.mock import patch, MagicMock
+
 
 # Asumiendo que el archivo principal se llama main.py
 # Ajusta la siguiente línea con el nombre correcto de tu archivo
