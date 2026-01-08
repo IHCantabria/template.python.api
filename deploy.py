@@ -155,7 +155,7 @@ def run_tests():
     """Run test suite."""
     logger.info("Ejecutando tests...")
     try:
-        result = run_command(["pytest"], capture_output=False)
+        run_command(["pytest"], capture_output=False)
         logger.info("✓ Tests pasaron exitosamente")
         return True
     except subprocess.CalledProcessError:
