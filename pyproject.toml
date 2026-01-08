@@ -5,7 +5,7 @@ requires = [
 build-backend = "flit_core.buildapi"
 
 [project]
-version = "v0.5.1"
+version = "v0.6.0"
 name = "templateapi"
 readme = "README.md"
 requires-python = ">=3.9"
