@@ -409,9 +409,7 @@ def main():
     if not version_info:
         sys.exit(1)
 
-    current_version, new_version, original_config, pyproject_path, config = (
-        version_info
-    )
+    _, new_version, original_config, pyproject_path, config = version_info
 
     # Handle dry-run mode
     if args.dry_run:
