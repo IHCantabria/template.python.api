@@ -176,7 +176,8 @@ def rollback_changes(original_content, filepath):
         logger.error("Por favor, revisa manualmente el archivo pyproject.toml")
 
 
-def main():
+def parse_arguments():
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Script de despliegue para actualizar versión y crear tags",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -213,99 +214,142 @@ Ejemplos:
         "--yes", "-y", action="store_true", help="Confirmar automáticamente"
     )
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    # Determine bump type
+
+def determine_bump_type(args):
+    """Determine version bump type from arguments."""
     if args.major:
-        bump_type = "major"
-    elif args.minor:
-        bump_type = "minor"
-    else:
-        bump_type = "patch"
+        return "major"
+    if args.minor:
+        return "minor"
+    return "patch"
 
-    if args.dry_run:
-        logger.info("🔍 MODO DRY-RUN: No se realizarán cambios reales")
 
-    # Check git status
+def perform_pre_deploy_checks(skip_tests):
+    """Perform pre-deployment checks.
+
+    Returns:
+        bool: True if all checks pass, False otherwise
+    """
     if not check_git_status():
-        sys.exit(1)
+        return False
 
-    # Check current branch
     if not check_current_branch():
-        sys.exit(1)
+        return False
 
-    # Run tests
-    if not args.skip_tests:
-        if not run_tests():
-            sys.exit(1)
-    else:
+    if skip_tests:
         logger.warning("⚠️  Saltando tests (--skip-tests)")
+        return True
 
-    # Read current version
+    return run_tests()
+
+
+def get_version_info(bump_type):
+    """Read current version and calculate new version.
+
+    Returns:
+        tuple: (current_version, new_version, original_config, pyproject_path)
+    """
     pyproject_path = Path("pyproject.toml")
     if not pyproject_path.exists():
         logger.error("No se encontró pyproject.toml")
-        sys.exit(1)
+        return None
 
     try:
         with open(pyproject_path, "rb") as f:
             config = tomli.load(f)
 
-        # Keep original config for rollback
         original_config = config.copy()
-
         current_version = config["project"]["version"]
-        logger.info(f"Versión actual: {current_version}")
-
-        # Calculate new version
         new_version = update_version(current_version, bump_type)
+
+        logger.info(f"Versión actual: {current_version}")
         logger.info(f"Nueva versión: {new_version}")
+
+        return (
+            current_version,
+            new_version,
+            original_config,
+            pyproject_path,
+            config,
+        )
 
     except Exception as e:
         logger.error(f"Error leyendo pyproject.toml: {e}")
-        sys.exit(1)
+        return None
 
-    # Confirm with user
-    if not args.yes and not args.dry_run:
-        logger.info(f"\n📦 Se va a desplegar la versión {new_version}")
-        logger.info("Esto incluye:")
-        logger.info("  1. Actualizar pyproject.toml")
-        logger.info("  2. Crear commit con los cambios")
-        logger.info(f"  3. Crear tag {new_version}")
-        logger.info("  4. Hacer push a origin")
 
-        response = input("\n¿Deseas continuar? (s/N): ")
-        if response.lower() not in ["s", "si", "sí", "yes", "y"]:
-            logger.info("Despliegue cancelado")
-            sys.exit(0)
+def confirm_deployment(new_version, auto_confirm):
+    """Ask user to confirm deployment.
 
-    if args.dry_run:
-        logger.info("\n✓ Dry-run completado. En modo normal se ejecutaría:")
-        logger.info(f"  - Actualizar versión a {new_version}")
-        logger.info("  - git add pyproject.toml")
-        logger.info("  - git commit -m 'Bump version to {new_version}'")
-        logger.info("  - git tag -a {new_version} -m 'Version {new_version}'")
-        logger.info("  - git push origin {new_version}")
-        logger.info("  - git push")
-        sys.exit(0)
+    Returns:
+        bool: True if confirmed, False otherwise
+    """
+    if auto_confirm:
+        return True
 
-    # Update version in config
-    config["project"]["version"] = new_version
+    logger.info(f"\n📦 Se va a desplegar la versión {new_version}")
+    logger.info("Esto incluye:")
+    logger.info("  1. Actualizar pyproject.toml")
+    logger.info("  2. Crear commit con los cambios")
+    logger.info(f"  3. Crear tag {new_version}")
+    logger.info("  4. Hacer push a origin")
 
-    # Preguntar por mensaje personalizado de commit
+    response = input("\n¿Deseas continuar? (s/N): ")
+    return response.lower() in ["s", "si", "sí", "yes", "y"]
+
+
+def show_dry_run_summary(new_version):
+    """Show what would be done in a real deployment."""
+    logger.info("\n✓ Dry-run completado. En modo normal se ejecutaría:")
+    logger.info(f"  - Actualizar versión a {new_version}")
+    logger.info("  - git add pyproject.toml")
+    logger.info("  - git commit -m 'Bump version to {new_version}'")
+    logger.info("  - git tag -a {new_version} -m 'Version {new_version}'")
+    logger.info("  - git push origin {new_version}")
+    logger.info("  - git push")
+
+
+def get_commit_message(new_version, auto_confirm):
+    """Get commit message, optionally with user customization.
+
+    Returns:
+        str: Commit message
+    """
     commit_message = f"Bump version to {new_version}"
-    if not args.yes and not args.dry_run:
-        response = input(
-            "\n¿Deseas añadir un mensaje personalizado al commit? (s/N): "
-        )
-        if response.lower() in ["s", "si", "sí", "yes", "y"]:
-            custom_msg = input(
-                "Escribe tu mensaje (se añadirá la versión al final): "
-            ).strip()
-            if custom_msg:
-                commit_message = f"{custom_msg} - {new_version}"
 
+    if auto_confirm:
+        return commit_message
+
+    response = input(
+        "\n¿Deseas añadir un mensaje personalizado al commit? (s/N): "
+    )
+    if response.lower() not in ["s", "si", "sí", "yes", "y"]:
+        return commit_message
+
+    custom_msg = input(
+        "Escribe tu mensaje (se añadirá la versión al final): "
+    ).strip()
+
+    if custom_msg:
+        return f"{custom_msg} - {new_version}"
+
+    return commit_message
+
+
+def perform_deployment(
+    config, new_version, commit_message, pyproject_path, original_config
+):
+    """Perform the actual deployment operations.
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
     try:
+        # Update version in config
+        config["project"]["version"] = new_version
+
         # Write new version
         logger.info("Actualizando pyproject.toml...")
         with open(pyproject_path, "wb") as f:
@@ -330,6 +374,7 @@ Ejemplos:
         run_command(["git", "push"])
 
         logger.info(f"\n✅ Despliegue completado exitosamente: {new_version}")
+        return True
 
     except subprocess.CalledProcessError as e:
         logger.error(f"\n❌ Error durante el despliegue: {e}")
@@ -339,10 +384,52 @@ Ejemplos:
         )
         logger.error("  git reset --soft HEAD~1  # Deshacer último commit")
         logger.error(f"  git tag -d {new_version}  # Eliminar tag local")
-        sys.exit(1)
+        return False
+
     except Exception as e:
         logger.error(f"\n❌ Error inesperado: {e}")
         rollback_changes(original_config, pyproject_path)
+        return False
+
+
+def main():
+    """Main deployment function."""
+    args = parse_arguments()
+    bump_type = determine_bump_type(args)
+
+    if args.dry_run:
+        logger.info("🔍 MODO DRY-RUN: No se realizarán cambios reales")
+
+    # Perform pre-deployment checks
+    if not perform_pre_deploy_checks(args.skip_tests):
+        sys.exit(1)
+
+    # Get version information
+    version_info = get_version_info(bump_type)
+    if not version_info:
+        sys.exit(1)
+
+    current_version, new_version, original_config, pyproject_path, config = (
+        version_info
+    )
+
+    # Handle dry-run mode
+    if args.dry_run:
+        show_dry_run_summary(new_version)
+        sys.exit(0)
+
+    # Confirm deployment with user
+    if not confirm_deployment(new_version, args.yes):
+        logger.info("Despliegue cancelado")
+        sys.exit(0)
+
+    # Get commit message
+    commit_message = get_commit_message(new_version, args.yes)
+
+    # Perform the deployment
+    if not perform_deployment(
+        config, new_version, commit_message, pyproject_path, original_config
+    ):
         sys.exit(1)
 
 
